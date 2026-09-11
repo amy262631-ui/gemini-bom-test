@@ -1,0 +1,161 @@
+
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gemini 1.5 工程圖 BOM 辨識測試</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body { max-width: 900px; margin: 30px auto; padding: 0 20px; font-family: sans-serif; background: #f8fafc; }
+    .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .field { margin-bottom: 12px; }
+    input, button { width: 100%; padding: 10px; box-sizing: border-box; margin-top: 4px; }
+    button { background: #0284c7; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+    button:hover { background: #0369a1; }
+    .btn-green { background: #16a34a; margin-top: 10px; }
+    #status { color: #0284c7; font-weight: bold; }
+    #error { color: #dc2626; white-space: pre-wrap; background: #fee2e2; padding: 10px; border-radius: 4px; display: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
+    th { background: #f1f5f9; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>🧪 Gemini 1.5 Flash 辨識測試</h2>
+    <div class="field">
+      <label>Gemini API Key (AIzaSy...):</label>
+      <input type="password" id="apiKey" placeholder="貼上免費 Gemini API Key" />
+    </div>
+    <div class="field">
+      <label>選擇測試工程圖:</label>
+      <input type="file" id="imageFile" accept="image/*" />
+    </div>
+    <button id="runBtn" type="button">開始辨識</button>
+    <p id="status"></p>
+    <div id="error"></div>
+  </div>
+
+  <div id="resultCard" class="card" style="display:none;">
+    <h3>辨識結果</h3>
+    <p><strong>圖名：</strong><span id="title">-</span></p>
+    <p><strong>圖號：</strong><span id="number">-</span></p>
+    <div style="overflow-x:auto;">
+      <table id="table">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button id="excelBtn" class="btn-green" type="button">下載 Excel (.xlsx)</button>
+  </div>
+
+  <script>
+    // ⚙️ 貼上你在步驟 1 取得的全新 GAS 網址
+    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwmoWzdG9Q-mhtvLgP5-w6BajsH01sABraTsQ5ZjnXbF7lDgv6uAKQBkXmcHHyzrNY/exec";
+
+    const apiKeyInput = document.getElementById("apiKey");
+    const imageFileInput = document.getElementById("imageFile");
+    const runBtn = document.getElementById("runBtn");
+    const status = document.getElementById("status");
+    const errorBox = document.getElementById("error");
+    const resultCard = document.getElementById("resultCard");
+
+    let currentTitle = "", currentNumber = "", headers = [], rows = [];
+
+    const savedKey = localStorage.getItem("GEMINI_TEST_KEY");
+    if (savedKey) apiKeyInput.value = savedKey;
+
+    function processImage(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const MAX_DIM = 4000;
+            let w = img.width, h = img.height;
+            if (w > MAX_DIM || h > MAX_DIM) {
+              if (w > h) { h = Math.round((h * MAX_DIM) / w); w = MAX_DIM; }
+              else { w = Math.round((w * MAX_DIM) / h); h = MAX_DIM; }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+            resolve({
+              base64: canvas.toDataURL("image/jpeg", 0.95).split(",")[1],
+              mimeType: "image/jpeg"
+            });
+          };
+          img.onerror = () => reject(new Error("圖片載入失敗"));
+          img.src = e.target.result;
+        };
+        reader.onerror = () => reject(new Error("讀取檔案失敗"));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    runBtn.addEventListener("click", async () => {
+      const key = apiKeyInput.value.trim();
+      const file = imageFileInput.files[0];
+      errorBox.style.display = "none";
+      errorBox.textContent = "";
+      status.textContent = "";
+      resultCard.style.display = "none";
+
+      if (!key || !file) {
+        alert("請輸入 API Key 並選擇圖檔");
+        return;
+      }
+      localStorage.setItem("GEMINI_TEST_KEY", key);
+
+      runBtn.disabled = true;
+      status.textContent = "圖檔處理與 Gemini 辨識中...";
+
+      try {
+        const { base64, mimeType } = await processImage(file);
+        const res = await fetch(GAS_WEBAPP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ apiKey: key, imageBase64: base64, mimeType })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        currentTitle = (data.drawing_title || "未辨識圖名").replace(/\\n|\n/g, " ");
+        currentNumber = data.drawing_number || "未辨識圖號";
+        headers = data.headers || [];
+        rows = data.rows || [];
+
+        document.getElementById("title").textContent = currentTitle;
+        document.getElementById("number").textContent = currentNumber;
+        document.querySelector("#table thead").innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr>`;
+        document.querySelector("#table tbody").innerHTML = rows.map(r => `<tr>${r.map(c => `<td>${c||""}</td>`).join("")}</tr>`).join("");
+
+        resultCard.style.display = "block";
+        status.textContent = "✅ 辨識成功！";
+      } catch (err) {
+        errorBox.style.display = "block";
+        errorBox.textContent = "辨識失敗：" + err.message;
+      } finally {
+        runBtn.disabled = false;
+      }
+    });
+
+    document.getElementById("excelBtn").addEventListener("click", () => {
+      const excelData = [
+        ["工程圖材料清單 (BOM)"],
+        ["圖名", currentTitle, "", "匯出日期", new Date().toISOString().split("T")[0]],
+        ["圖號", currentNumber],
+        [],
+        headers,
+        ...rows
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "BOM");
+      XLSX.writeFile(wb, `${currentNumber}_${currentTitle}.xlsx`);
+    });
+  </script>
+</body>
+</html>
