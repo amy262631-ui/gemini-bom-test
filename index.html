@@ -1,71 +1,183 @@
-
 <!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gemini 1.5 工程圖 BOM 辨識測試</title>
+  <title>Gemini 1.5 工程圖 BOM 辨識與 Excel 匯出</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
   <style>
-    body { max-width: 900px; margin: 30px auto; padding: 0 20px; font-family: sans-serif; background: #f8fafc; }
-    .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .field { margin-bottom: 12px; }
-    input, button { width: 100%; padding: 10px; box-sizing: border-box; margin-top: 4px; }
-    button { background: #0284c7; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+    body {
+      max-width: 960px;
+      margin: 30px auto;
+      padding: 0 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif;
+      line-height: 1.5;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      margin-bottom: 24px;
+    }
+    .field { margin-bottom: 16px; }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    input[type="text"], input[type="password"], input[type="file"] {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 15px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #fff;
+    }
+    button {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      background: #0284c7;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
     button:hover { background: #0369a1; }
-    .btn-green { background: #16a34a; margin-top: 10px; }
-    #status { color: #0284c7; font-weight: bold; }
-    #error { color: #dc2626; white-space: pre-wrap; background: #fee2e2; padding: 10px; border-radius: 4px; display: none; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
-    th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
-    th { background: #f1f5f9; }
+    button:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-excel {
+      background: #16a34a;
+      margin-top: 16px;
+    }
+    .btn-excel:hover { background: #15803d; }
+    .status-box {
+      margin-top: 12px;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    #error { 
+      color: #dc2626; 
+      word-break: break-all; 
+      white-space: pre-wrap; 
+      background: #fef2f2;
+      padding: 10px;
+      border-radius: 6px;
+      display: none;
+      margin-top: 10px;
+    }
+    #error:not(:empty) { display: block; }
+    #status { color: #0284c7; }
+    .meta-box {
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 14px 18px;
+      margin: 16px 0;
+    }
+    .meta-box p { margin: 6px 0; font-size: 1rem; }
+    .table-container {
+      overflow-x: auto;
+      margin-top: 16px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+    th, td {
+      border: 1px solid #e2e8f0;
+      padding: 10px 14px;
+    }
+    th {
+      background: #f8fafc;
+      font-weight: 600;
+      color: #334155;
+    }
+    tr:nth-child(even) { background: #fdfdfd; }
   </style>
 </head>
 <body>
 
   <div class="card">
-    <h2>🧪 Gemini 1.5 Flash 辨識測試</h2>
+    <h2 style="margin-top:0;">⚡ Gemini 1.5 原生工程圖材料清單（BOM）辨識</h2>
+
     <div class="field">
-      <label>Gemini API Key (AIzaSy...):</label>
-      <input type="password" id="apiKey" placeholder="貼上免費 Gemini API Key" />
+      <label for="apiKey">Gemini API Key (免費版)</label>
+      <input id="apiKey" type="password" placeholder="請貼上 AIzaSy 開頭的 Gemini API Key" autocomplete="off" />
     </div>
+
     <div class="field">
-      <label>選擇測試工程圖:</label>
-      <input type="file" id="imageFile" accept="image/*" />
+      <label for="imageFile">選擇工程圖（支援 4000px 大圖 PNG / JPG）</label>
+      <input id="imageFile" type="file" accept="image/png,image/jpeg,image/webp" />
     </div>
-    <button id="runBtn" type="button">開始辨識</button>
-    <p id="status"></p>
-    <div id="error"></div>
+
+    <button id="recognizeButton" type="button">開始 AI 辨識</button>
+
+    <div class="status-box">
+      <p id="status"></p>
+      <div id="error"></div>
+    </div>
   </div>
 
-  <div id="resultCard" class="card" style="display:none;">
-    <h3>辨識結果</h3>
-    <p><strong>圖名：</strong><span id="title">-</span></p>
-    <p><strong>圖號：</strong><span id="number">-</span></p>
-    <div style="overflow-x:auto;">
-      <table id="table">
+  <section id="resultSection" class="card" hidden>
+    <h3 style="margin-top:0;">📊 辨識結果與表格預覽</h3>
+
+    <div class="meta-box">
+      <p><strong>圖名：</strong> <span id="drawingTitle">-</span></p>
+      <p><strong>圖號：</strong> <span id="drawingNumber">-</span></p>
+      <p><strong>辨識時間：</strong> <span id="recognizeTime">-</span></p>
+    </div>
+
+    <div class="table-container">
+      <table id="partsTable">
         <thead></thead>
         <tbody></tbody>
       </table>
     </div>
-    <button id="excelBtn" class="btn-green" type="button">下載 Excel (.xlsx)</button>
-  </div>
+
+    <button id="downloadExcelButton" class="btn-excel" type="button">
+      📥 下載自訂格式 Excel (.xlsx)
+    </button>
+  </section>
 
   <script>
-    // ⚙️ 貼上你在步驟 1 取得的全新 GAS 網址
+    // ⚙️ 請確認為您新建的 Gemini GAS 網頁應用程式網址 (/exec 結尾)
     const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwmoWzdG9Q-mhtvLgP5-w6BajsH01sABraTsQ5ZjnXbF7lDgv6uAKQBkXmcHHyzrNY/exec";
 
     const apiKeyInput = document.getElementById("apiKey");
     const imageFileInput = document.getElementById("imageFile");
-    const runBtn = document.getElementById("runBtn");
-    const status = document.getElementById("status");
-    const errorBox = document.getElementById("error");
-    const resultCard = document.getElementById("resultCard");
+    const recognizeButton = document.getElementById("recognizeButton");
+    const statusElement = document.getElementById("status");
+    const errorElement = document.getElementById("error");
+    const resultSection = document.getElementById("resultSection");
 
-    let currentTitle = "", currentNumber = "", headers = [], rows = [];
+    const drawingTitleElement = document.getElementById("drawingTitle");
+    const drawingNumberElement = document.getElementById("drawingNumber");
+    const recognizeTimeElement = document.getElementById("recognizeTime");
+    const partsTableHead = document.querySelector("#partsTable thead");
+    const partsTableBody = document.querySelector("#partsTable tbody");
+    const downloadExcelButton = document.getElementById("downloadExcelButton");
 
-    const savedKey = localStorage.getItem("GEMINI_TEST_KEY");
-    if (savedKey) apiKeyInput.value = savedKey;
+    let parsedHeaders = [];
+    let parsedDataRows = [];
+    let currentDrawingTitle = "";
+    let currentDrawingNumber = "";
+
+    const savedApiKey = localStorage.getItem("GEMINI_STABLE_KEY");
+    if (savedApiKey) {
+      apiKeyInput.value = savedApiKey;
+    }
 
     function processImage(file) {
       return new Promise((resolve, reject) => {
@@ -74,87 +186,152 @@
           const img = new Image();
           img.onload = () => {
             const MAX_DIM = 4000;
-            let w = img.width, h = img.height;
-            if (w > MAX_DIM || h > MAX_DIM) {
-              if (w > h) { h = Math.round((h * MAX_DIM) / w); w = MAX_DIM; }
-              else { w = Math.round((w * MAX_DIM) / h); h = MAX_DIM; }
+            let width = img.width;
+            let height = img.height;
+
+            if (width > MAX_DIM || height > MAX_DIM) {
+              if (width > height) {
+                height = Math.round((height * MAX_DIM) / width);
+                width = MAX_DIM;
+              } else {
+                width = Math.round((width * MAX_DIM) / height);
+                height = MAX_DIM;
+              }
             }
+
             const canvas = document.createElement("canvas");
-            canvas.width = w; canvas.height = h;
-            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
             resolve({
-              base64: canvas.toDataURL("image/jpeg", 0.95).split(",")[1],
+              base64: dataUrl.split(",")[1],
               mimeType: "image/jpeg"
             });
           };
-          img.onerror = () => reject(new Error("圖片載入失敗"));
+          img.onerror = () => reject(new Error("載入圖片解析失敗。"));
           img.src = e.target.result;
         };
-        reader.onerror = () => reject(new Error("讀取檔案失敗"));
+        reader.onerror = () => reject(new Error("讀取檔案失敗。"));
         reader.readAsDataURL(file);
       });
     }
 
-    runBtn.addEventListener("click", async () => {
-      const key = apiKeyInput.value.trim();
-      const file = imageFileInput.files[0];
-      errorBox.style.display = "none";
-      errorBox.textContent = "";
-      status.textContent = "";
-      resultCard.style.display = "none";
+    recognizeButton.addEventListener("click", async () => {
+      const apiKey = apiKeyInput.value.trim();
+      const imageFile = imageFileInput.files[0];
 
-      if (!key || !file) {
-        alert("請輸入 API Key 並選擇圖檔");
+      errorElement.textContent = "";
+      statusElement.textContent = "";
+      resultSection.hidden = true;
+      drawingTitleElement.textContent = "-";
+      drawingNumberElement.textContent = "-";
+      partsTableHead.innerHTML = "";
+      partsTableBody.innerHTML = "";
+
+      if (!apiKey) {
+        errorElement.textContent = "請輸入 Gemini API Key。";
         return;
       }
-      localStorage.setItem("GEMINI_TEST_KEY", key);
+      if (!imageFile) {
+        errorElement.textContent = "請選擇一張工程圖。";
+        return;
+      }
 
-      runBtn.disabled = true;
-      status.textContent = "圖檔處理與 Gemini 辨識中...";
+      localStorage.setItem("GEMINI_STABLE_KEY", apiKey);
+
+      recognizeButton.disabled = true;
+      recognizeButton.textContent = "正在辨識中，請稍候...";
+      statusElement.textContent = "正在最佳化工程圖面並傳輸...";
 
       try {
-        const { base64, mimeType } = await processImage(file);
-        const res = await fetch(GAS_WEBAPP_URL, {
+        const { base64, mimeType } = await processImage(imageFile);
+        statusElement.textContent = "Gemini 1.5 正在讀取圖面、圖號與 BOM 表格（約 5~10 秒）...";
+
+        const response = await fetch(GAS_WEBAPP_URL, {
           method: "POST",
+          redirect: "follow", // 確保跟隨 GAS 302 重導向
           headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ apiKey: key, imageBase64: base64, mimeType })
+          body: JSON.stringify({
+            apiKey: apiKey,
+            imageBase64: base64,
+            mimeType: mimeType
+          })
         });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
 
-        currentTitle = (data.drawing_title || "未辨識圖名").replace(/\\n|\n/g, " ");
-        currentNumber = data.drawing_number || "未辨識圖號";
-        headers = data.headers || [];
-        rows = data.rows || [];
+        const responseText = await response.text();
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch {
+          throw new Error(`伺服器回傳格式異常：\n${responseText}`);
+        }
 
-        document.getElementById("title").textContent = currentTitle;
-        document.getElementById("number").textContent = currentNumber;
-        document.querySelector("#table thead").innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr>`;
-        document.querySelector("#table tbody").innerHTML = rows.map(r => `<tr>${r.map(c => `<td>${c||""}</td>`).join("")}</tr>`).join("");
+        if (result.error) {
+          throw new Error(typeof result.error === "string" ? result.error : JSON.stringify(result.error));
+        }
 
-        resultCard.style.display = "block";
-        status.textContent = "✅ 辨識成功！";
+        currentDrawingTitle = (result.drawing_title || "未辨識圖名").replace(/\\n|\n/g, " ");
+        currentDrawingNumber = (result.drawing_number || "未辨識圖號").replace(/\\n|\n/g, " ");
+        parsedHeaders = result.headers || [];
+        parsedDataRows = result.rows || [];
+
+        if (!parsedHeaders.length || !parsedDataRows.length) {
+          throw new Error("AI 未在此圖面中偵測到材料清單表格。");
+        }
+
+        drawingTitleElement.textContent = currentDrawingTitle;
+        drawingNumberElement.textContent = currentDrawingNumber;
+        recognizeTimeElement.textContent = new Date().toLocaleString("zh-TW");
+
+        partsTableHead.innerHTML = `<tr>${parsedHeaders.map(h => `<th>${h}</th>`).join("")}</tr>`;
+        partsTableBody.innerHTML = parsedDataRows.map(row => 
+          `<tr>${row.map(cell => `<td>${cell || ""}</td>`).join("")}</tr>`
+        ).join("");
+
+        resultSection.hidden = false;
+        statusElement.textContent = "✅ 辨識完成！可於下方預覽或點擊匯出 Excel。";
       } catch (err) {
-        errorBox.style.display = "block";
-        errorBox.textContent = "辨識失敗：" + err.message;
+        console.error(err);
+        errorElement.textContent = err.message || String(err);
+        statusElement.textContent = "";
       } finally {
-        runBtn.disabled = false;
+        recognizeButton.disabled = false;
+        recognizeButton.textContent = "開始 AI 辨識";
       }
     });
 
-    document.getElementById("excelBtn").addEventListener("click", () => {
-      const excelData = [
-        ["工程圖材料清單 (BOM)"],
-        ["圖名", currentTitle, "", "匯出日期", new Date().toISOString().split("T")[0]],
-        ["圖號", currentNumber],
+    downloadExcelButton.addEventListener("click", () => {
+      if (!parsedHeaders.length || !parsedDataRows.length) return;
+
+      const excelRows = [
+        ["工程圖材料清單 (BOM)", "", "", "", "", ""],
+        ["圖名", currentDrawingTitle, "", "匯出日期", new Date().toISOString().split("T")[0], ""],
+        ["圖號", currentDrawingNumber, "", "產製方式", "Gemini 1.5 視覺辨識", ""],
         [],
-        headers,
-        ...rows
+        parsedHeaders,
+        ...parsedDataRows
       ];
-      const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+      const ws = XLSX.utils.aoa_to_sheet(excelRows);
+
+      ws['!cols'] = [
+        { wch: 10 },
+        { wch: 24 },
+        { wch: 20 },
+        { wch: 10 },
+        { wch: 14 },
+        { wch: 24 }
+      ];
+
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "BOM");
-      XLSX.writeFile(wb, `${currentNumber}_${currentTitle}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, "材料清單");
+
+      const safeNumber = currentDrawingNumber.replace(/[\\/:*?"<>|]/g, "_");
+      const safeTitle = currentDrawingTitle.replace(/[\\/:*?"<>|]/g, "_");
+      XLSX.writeFile(wb, `${safeNumber}_${safeTitle}.xlsx`);
     });
   </script>
 </body>
