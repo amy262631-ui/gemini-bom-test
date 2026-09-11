@@ -118,7 +118,7 @@
     </div>
 
     <div class="field">
-      <label for="imageFile">選擇工程圖（支援 4000px 大圖 PNG / JPG）</label>
+      <label for="imageFile">選擇工程圖（支援 4000px 高解析大圖 PNG / JPG）</label>
       <input id="imageFile" type="file" accept="image/png,image/jpeg,image/webp" />
     </div>
 
@@ -152,7 +152,7 @@
   </section>
 
   <script>
-    // ⚙️ 請確認為您新建的 Gemini GAS 網頁應用程式網址 (/exec 結尾)
+    // ⚙️ 新的 GAS 網頁應用程式網址
     const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwmoWzdG9Q-mhtvLgP5-w6BajsH01sABraTsQ5ZjnXbF7lDgv6uAKQBkXmcHHyzrNY/exec";
 
     const apiKeyInput = document.getElementById("apiKey");
@@ -252,7 +252,7 @@
 
         const response = await fetch(GAS_WEBAPP_URL, {
           method: "POST",
-          redirect: "follow", // 確保跟隨 GAS 302 重導向
+          redirect: "follow",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
           body: JSON.stringify({
             apiKey: apiKey,
